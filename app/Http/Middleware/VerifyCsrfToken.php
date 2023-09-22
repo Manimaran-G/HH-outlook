@@ -12,6 +12,10 @@ class VerifyCsrfToken extends Middleware
      * @var array<int, string>
      */
     protected $except = [
-        //
+        'add-event', // Replace with the actual route name or URL path
+        'update-event',
+        'cancel-event',
+        'delete-event',
+        'get-event'
     ];
 }

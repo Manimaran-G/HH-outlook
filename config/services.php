@@ -31,4 +31,15 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'azure' => [
+        'client_id' => env('MS_GRAPH_CLIENT_ID'),
+        'client_secret' => env('MS_GRAPH_CLIENT_SECRET'),
+        'redirect_uri' => env('MS_GRAPH_REDIRECT_URI'),
+        'authority' => 'https://login.microsoftonline.com/common',
+        'authorize_endpoint' => '/oauth2/v2.0/authorize',
+        'token_endpoint' => '/oauth2/v2.0/token',
+        'scopes' => 'openid profile User.Read Calendars.ReadWrite',
+    ],
+    
+
 ];

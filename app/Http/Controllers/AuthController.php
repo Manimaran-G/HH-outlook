@@ -9,6 +9,8 @@ use App\TokenStore\TokenCache;
 use Illuminate\Http\Request;
 use Microsoft\Graph\Graph;
 use Microsoft\Graph\Model;
+use League\OAuth2\Client\Provider\GenericProvider;
+use Illuminate\Support\Facades\Session;
 
 class AuthController extends Controller
 {
@@ -32,6 +34,28 @@ class AuthController extends Controller
 
     // Redirect to AAD signin page
     return redirect()->away($authUrl);
+  }
+  public function signin1()
+  {
+      // Initialize the OAuth client
+      $oauthClient = new GenericProvider([
+          'clientId'                => config('services.azure.client_id'),
+          'clientSecret'            => config('services.azure.client_secret'),
+          'redirectUri'             => config('services.azure.redirect'),
+          'urlAuthorize'            => config('services.azure.authority') . config('services.azure.authorize_endpoint'),
+          'urlAccessToken'          => config('services.azure.authority') . config('services.azure.token_endpoint'),
+          'urlResourceOwnerDetails' => '',
+          'scopes'                  => config('services.azure.scopes'),
+      ]);
+
+      // Generate the authorization URL
+      $authorizationUrl = $oauthClient->getAuthorizationUrl();
+
+      // Save client state so we can validate it in the callback
+      Session::put('oauthState', $oauthClient->getState());
+
+      // Redirect to AAD signin page
+      return redirect()->away($authorizationUrl);
   }
 
   public function callback(Request $request)

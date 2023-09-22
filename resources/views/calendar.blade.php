@@ -1,7 +1,7 @@
 <!-- Copyright (c) Microsoft Corporation.
      Licensed under the MIT License. -->
 
-@extends('layout')
+     @extends('layout')
 
 @section('content')
 <h1>Calendar</h1>
