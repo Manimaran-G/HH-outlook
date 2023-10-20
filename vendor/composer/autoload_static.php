@@ -548,6 +548,7 @@ class ComposerStaticInit3b56f51ca28f78da2b4ac3c39202f6fc
     );
 
     public static $classMap = array (
+        'App\\Console\\Commands\\RefreshAccessToken' => __DIR__ . '/../..' . '/app/Console/Commands/RefreshAccessToken.php',
         'App\\Console\\Kernel' => __DIR__ . '/../..' . '/app/Console/Kernel.php',
         'App\\Exceptions\\Handler' => __DIR__ . '/../..' . '/app/Exceptions/Handler.php',
         'App\\Http\\Controllers\\AuthController' => __DIR__ . '/../..' . '/app/Http/Controllers/AuthController.php',

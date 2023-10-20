@@ -1,12 +1,18 @@
 <?php
 
 namespace App\Http\Controllers;
+use Firebase\JWT\JWT;
+namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Microsoft\Graph\Graph;
 use Microsoft\Graph\Model;
+use Microsoft\Graph\Model\User;
+
 use Illuminate\Support\Facades\Log;
 use GuzzleHttp\Client;
+use Microsoft\Graph\Model\OnlineMeeting;
+use Microsoft\Graph\Model\IdentitySet;
 use Microsoft\Graph\Model\Event;
 use Microsoft\Graph\Model\DateTimeTimeZone;
 use Microsoft\Graph\Model\Location;
@@ -22,14 +28,14 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
         // Redirect the user to Microsoft login to obtain an authorization code
         $url = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
         $query = http_build_query([
-            'client_id' => 'b6d1242b-6b4c-4d20-a4ed-e14125685951',
+            'client_id' => '228ebf41-ca17-4127-b019-3798edb9e2b9',
             'scope' => 'offline_access User.Read Calendars.ReadWrite',
             'response_type' => 'code',
             'redirect_uri' => 'http://localhost:8000/callback', // Your redirect URL
             'response_mode' => 'query',
             'state' => bin2hex(random_bytes(16)),
         ]);
-
+       // return view('events', compact('url','query'));
         return redirect("$url?$query");
     }
 
@@ -39,12 +45,12 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
     $authorizationCode = $request->input('code');
 
     // Replace 'YOUR_CLIENT_SECRET' with your actual client secret
-    $clientSecret = 'TM28Q~tLC37JgFHDrAnm0FQ6o9FjI.M1VpWdIcch'; // Replace with your actual client secret
+    $clientSecret = 'rzw8Q~0o5Qv2lUW2jB~3J1GCOegeC5JIvPRwabeH'; // Replace with your actual client secret
 
     // Prepare the parameters for the token request
     $tokenParams = [
         'grant_type' => 'authorization_code',
-        'client_id' => 'b6d1242b-6b4c-4d20-a4ed-e14125685951', // Replace with your actual client ID
+        'client_id' => '228ebf41-ca17-4127-b019-3798edb9e2b9', // Replace with your actual client ID
         'scope' => 'offline_access User.Read Calendars.ReadWrite', // Adjust scope as needed
         'code' => $authorizationCode,
         'redirect_uri' => 'http://localhost:8000/callback', // Your redirect URL
@@ -69,6 +75,9 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
             //print_r($responseData['access_token']);
             if (isset($responseData['access_token'])) {
                 $accessToken = $responseData['access_token'];
+                $refreshToken = $responseData['refresh_token'];
+                
+                //print_r($accessToken);
                 $apiEndpoint = 'https://graph.microsoft.com/v1.0/me/events';
                 $headers = [
                     'Authorization' => 'Bearer ' . $accessToken,
@@ -79,10 +88,39 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
                     'headers' => $headers,
                 ]);
 
+                $filePath ='D:\Gopi_WorkSpace\HH-outlook-main\token.json';
+
+                if (file_exists($filePath)) {
+                    
+                    $jsonData = file_get_contents($filePath);
+                    $data = json_decode($jsonData, true);
+                    $newaccessToken = $accessToken;
+                    $newrefreshToken = $refreshToken;
+                    // Check if the file contains an access token
+                    if ($data && isset($data['access_token'])) {
+                        // Replace the existing access token
+                        $data['access_token'] = $newaccessToken; // Replace with your new access token
+                    } else {
+                        // If no access token exists, add it to the data
+                        $data['access_token'] =  $newaccessToken; // Replace with your new access token
+                    }
+                    if (isset($data['refresh_token'])) {
+                        // Replace the existing refresh token
+                        $data['refresh_token'] = $newrefreshToken;
+                    } else {
+                        // If no refresh token exists, add it to the data
+                        $data['refresh_token'] = $newrefreshToken;
+                    }
+                } 
+                // Convert the data to JSON format
+                $jsonData = json_encode($data);
+                // Save the JSON data to the file
+                file_put_contents($filePath, $jsonData);
+
                 if ($response1->getStatusCode() === 200) {
                     // Retrieve and process the response body
                     $responseData1 = json_decode($response1->getBody()->getContents(), true);
-
+ 
                     if (isset($responseData1['value'])) {
                         // Initialize an array to store the events data
                         $eventsData = [];
@@ -102,7 +140,7 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
                                 'attendees_required' => [],
                                 'attendees_optional' => []
                             ];
-                        
+                            
                             // Extract attendees
                             foreach ($eventData['attendees'] as $attendee) {
                                 $attendeeType = $attendee['type'];
@@ -115,13 +153,20 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
                                 }
                             }
                         }
-                        
+                        Log::info('Event data:', $eventsData);
 
                         // Return the events data as JSON
                         //return response()->json($responseData1);
                         //return view('events',$responseData1);
-                        $editEventId = 0;
-                        return view('events', ['eventsData' => $eventsData,'editEventId' => $editEventId]);
+                         $editEventId = 0;
+                        $request->session()->flash('eventsData', $eventsData);
+                        $request->session()->flash('editEventId', $editEventId);
+                        $request->session()->flash('accessToken',$accessToken);
+                        $daaa = session(['eventsData' => $eventsData, 'editEventId' => $editEventId, 'accessToken' => $accessToken]);
+                        //return redirect()->route('goEvents', ['eventsData' => $eventsData]);
+                        return redirect()->route('goEvents');
+                        //return view ('events');
+                        // return view('events', ['eventsData' => $eventsData,'editEventId' => $editEventId]);
                     } else {
                         // Handle the case where there are no events in the response
                         return response()->json([]);
@@ -143,76 +188,180 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
         return response()->json(['error' => 'Token request exception'], 500);
     }
 }
+public function getAllEvents(Request $request)
+{
+    $accessToken = $this->getAccessTokenFromJsonFile();
+    $client = new Client([
+        'verify' => false, // Disable SSL verification if needed
+    ]);
+    $apiEndpoint = 'https://graph.microsoft.com/v1.0/me/events';
+    $headers = [
+        'Authorization' => 'Bearer ' . $accessToken,
+        'Content-Type' => 'application/json',
+    ];
+    $response = $client->get($apiEndpoint, [
+        'headers' => $headers,
+    ]);
+    if ($response->getStatusCode() === 200) {
+        // Retrieve and process the response body
+        $responseData1 = json_decode($response->getBody()->getContents(), true);
 
+        if (isset($responseData1['value'])) {
+            // Initialize an array to store the events data
+            $eventsData = [];
+            // Loop through each event in the "value" array
+            foreach ($responseData1['value'] as $eventData) {
+                // Extract event details and add them to the $eventsData array
+                $eventsData[] = [
+                    'title' => $eventData['subject'],
+                    'start' => $eventData['start']['dateTime'],
+                    'end' => $eventData['end']['dateTime'],
+                    'access_token' => $accessToken,
+                    'event_id' => $eventData['id'],
+                    'location' => $eventData['location']['displayName'],
+                    'timezone' => $eventData['start']['timeZone'],
+                    'content' => $eventData['body']['content'],
+                    'attendees_required' => [],
+                    'attendees_optional' => []
+                ];
 
-    public function createEvent1(Request $request)
-    {
-        // Replace these with your own values
-        $access_token = "EwBoA8l6BAAUAOyDv0l6PcCVu89kmzvqZmkWABkAAVPPHgKurVXVJfG4ylZOq1ejgteQFc/PT9k8gi4mYRuiqMZT+x2qVrYyZH2thtNZo+YPJwKA00pXrCc8c7CE/gNIn4pljtK1s9rBLlCUcU/zfoSNoUD+ju6Hjv86ysq+mXxXHuy+RPLwagYMlEaS9BykXJebK/PNYHDxzORgVLYoMJjXl30ipWljdUBzV4KTnCler7fQr47OhCe4Y5fNY5i/OkcrYE42HihEZkEVRLeVL1UAx4u20K3d+XQgszfxrkq/kfQXVTDDJNuhRyvuzcZFLtPx/VQ5SxQ/zFU5+M87O6OCkc/I9omHrohd2XUpvwJKTQ0gdGvgzMXjTet4Ni4DZgAACMXyGo+GIIBYOAKdj+4ex2hFza9PxD781cLur7BAyxi3p7Nc4QxuQH6+7otML/5K3IA/0nV/9tkZkUWe8ufX4Z9YemxJneVBbJjOasa2v07Z8IPC96aCd3EZhi0hlUcXvlQL0dpyyOWlsjzZKN7S5vc/qF5srceuDicKs3/ofBLrzJuOv5DMRzYP+gabjvQ80VnInddtfa3Uh/gTWBJBPwtQhI4kbkKkdxJwmk+gJof1ecsDAgCy2SniZCYJ56x6LPER+rYeWl6ABgoMk+0s6c7uD6aNOpQ8Mf0OuXIoNZvz4ulDHEscy4Jqhtqsh1VeG5fTdBa4y6U59gpixtDBS5uS/FJg3wMZ2SRA/6+q8TB7ci5xJUHEf+tHJxOt1/cfHAMbN0tfV7R9BPCxMU14S4yMUgw0aWNOidEq6OJp3DwfboFmNAxNvHd7e1vWIyy2r4OiklA2k+Z8uc0HDSGG64dLUIQc0xcTJ8WLZ6cV0IMw4McKFLPfQjcnQlFrAS6yJgZ5AT5ewgXdp5CbIP3iJKmlzFXrpp7Ppl990UEHaGEMhkiiIH6x+qxoCtFN8Qym21su7tFyeBwjtj2y0Mbvl16/ZR8nURNJO5RwHhXySewzLQk1/qovnH8o7RvNQojR4jHjdIWUB0RTPj8vFb4Bz8qHp8h38Z2tz0uSfAGYAb9TRGFTktNC6XidjZVcduMKPVQlyB0ugmQz/52knLRzhGJ4WUvPRP8ixG6Keh5D1WhJRPs8tv7p7pYmTH64J6O9b/cSgwI=Event ID: AQMkADAwATM0MDAAMS00Njc4LWI1MGItMDACLTAwCgBGAAAD9w3QyxI0h0aYkzJFyPdneQcA96mqKRJcE0Wy-9eK52XQpgAAAgENAAAA96mqKRJcE0Wy-9eK52XQpgABJnGl6gAAAA==";
-        $event_data = [
-                    "subject" => "Meeting with Client",
-                    "start" => [
-                    "dateTime" => "2023-09-23T21:00:00",
-                    "timeZone" => "Asia/Kolkata"
-                    ],
-                    "end" => [
-                    "dateTime" => "2023-09-23T21:30:00",
-                    "timeZone" => "Asia/Kolkata"
-                    ],
-                    "location" => [
-                    "displayName" => "Client Office"
-                    ],
-                    "body" => [
-                    "contentType" => "HTML",
-                    "content" => "Discuss project details."
-                    ],
-                    "attendees" => [
-                    [
-                        "emailAddress" => [
-                            "address" => "john@example.com",
-                            "name" => "John Doe"
-                        ],
-                        "type" => "required"
-                    ],
-                    [
-                        "emailAddress" => [
-                            "address" => "jane@example.com",
-                            "name" => "Jane Smith"
-                        ],
-                        "type" => "required"
-                    ]
-                    ]
-            ];
+                // Extract attendees
+                foreach ($eventData['attendees'] as $attendee) {
+                    $attendeeType = $attendee['type'];
+                    $emailAddress = $attendee['emailAddress']['address'];
 
+                    if ($attendeeType === 'required') {
+                        $eventsData[count($eventsData) - 1]['attendees_required'][] = $emailAddress;
+                    } elseif ($attendeeType === 'optional') {
+                        $eventsData[count($eventsData) - 1]['attendees_optional'][] = $emailAddress;
+                    }
+                }
+            }    
+                $editEventId = 0;
+                $request->session()->flash('eventsData', $eventsData);
+                $request->session()->flash('editEventId', $editEventId);
+                $request->session()->flash('accessToken',$accessToken);
 
-        $client = new Client([
-            'verify' => false, // Disable SSL verification if needed
-        ]);
-
-        try {
-            $response = $client->post('https://graph.microsoft.com/v1.0/me/events', [
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $access_token,
-                    'Content-Type' => 'application/json'
-                ],
-                'json' => $event_data,
-            ]);
-
-            // Handle the response as needed (e.g., check for success)
-            $statusCode = $response->getStatusCode();
-            print_r($statusCode);
-            if ($statusCode === 201) {
-                // Event created successfully
-                return response()->json(['message' => 'Event created successfully']);
-            } else {
-                // Handle error response
-                return response()->json(['error' => 'Event creation failed'], $statusCode);
-            }
-        } catch (\Exception $e) {
-            // Handle exceptions (e.g., token expiration)
-            return response()->json(['error' => $e->getMessage()], 500);
+                
+                //Log::info('Event data:', $eventsData);
+                //Session::put('eventsData', $eventsData);
+                return redirect()->route('goEvents');
+            
         }
     }
+
+    // Return an empty array or handle the error as needed
+    return [];
+}
+
+public function refreshToken() {
+    $refreshToken = $this->getRefreshTokenFromJsonFile();
+    
+    $client = new Client([
+        'verify' => false, // Disable SSL verification if needed
+    ]);
+    $tenant = 'f8cdef31-a31e-4b4a-93e4-5f571e91255a';
+    //$tenant = 'f8cdef31-a31e-4b4a-93e4-5f571e91255a';
+    $tokenResponse = $client->post("https://login.microsoftonline.com/common/oauth2/v2.0/token", [
+        'form_params' => [
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $refreshToken,
+            'client_id' => '228ebf41-ca17-4127-b019-3798edb9e2b9',
+            'client_secret' => 'rzw8Q~0o5Qv2lUW2jB~3J1GCOegeC5JIvPRwabeH',
+            'scope' => 'https://graph.microsoft.com/.default',
+        ],
+    ]);
+
+
+    if ($tokenResponse->getStatusCode() === 200) {
+        $tokenData = json_decode($tokenResponse->getBody(), true);
+        $newAccessToken = $tokenData['access_token'];
+        // Use the newAccessToken to make requests to Microsoft Graph.
+        Log::info('Access token refreshed: ' . $newAccessToken);
+        $filePath ='D:\Gopi_WorkSpace\HH-outlook-main\token.json';
+
+        if (file_exists($filePath)) {
+            
+            $jsonData = file_get_contents($filePath);
+            $data = json_decode($jsonData, true);
+            $accessToken = $newAccessToken;
+            // Check if the file contains an access token
+            if ($data && isset($data['access_token'])) {
+                // Replace the existing access token
+                $data['access_token'] = $accessToken; // Replace with your new access token
+            } else {
+                // If no access token exists, add it to the data
+                $data['access_token'] =  $accessToken; // Replace with your new access token
+            }
+        } 
+        // Convert the data to JSON format
+        $jsonData = json_encode($data);
+        // Save the JSON data to the file
+        file_put_contents($filePath, $jsonData);
+
+        return $newAccessToken;
+    } else {
+        // Handle the error, e.g., by requesting user reauthorization.
+        return null;
+    }
+}
+
+
+public function refreshTokenPeriodically() {
+    while (true) {
+        $newAccessToken = $this->refreshToken(); // Call the refreshToken function
+       // Log::info('Access token refreshed: ' . $newAccessToken);
+        if ($newAccessToken) {
+            // Successfully refreshed the access token; you can use it for requests.
+            // You may want to store the access token securely and use it in your application.
+        } else {
+            // Handle the case where the access token couldn't be refreshed (e.g., reauthorization).
+        }
+
+        sleep(5); 
+    }
+}
+
+
+
+
+public function getAccessTokenFromJsonFile()
+{
+    // Read the access token from the token.json file
+    $tokenFilePath = 'D:\Gopi_WorkSpace\HH-outlook-main\token.json';
+    if (file_exists($tokenFilePath)) {
+        $tokenData = json_decode(file_get_contents($tokenFilePath), true);
+        if (isset($tokenData['access_token'])) {
+            return $tokenData['access_token'];
+        }
+    }
+
+    // Handle the case where the access token is not found or invalid
+    return null;
+}
+
+public function getRefreshTokenFromJsonFile()
+{
+    // Read the access token from the token.json file
+    $tokenFilePath = 'D:\Gopi_WorkSpace\HH-outlook-main\token.json';
+    if (file_exists($tokenFilePath)) {
+        $tokenData = json_decode(file_get_contents($tokenFilePath), true);
+        if (isset($tokenData['refresh_token'])) {
+            return $tokenData['refresh_token'];
+        }
+    }
+
+    // Handle the case where the access token is not found or invalid
+    return null;
+}
+public function goEvents() {
+    $eventsData = session('eventsData');
+    //Log::info('sessionData:', ['eventsData' => $eventsData]);
+    $editEventId = session('editEventId');
+    $accessToken = $this->getAccessTokenFromJsonFile();
+    
+    return view('events', ['eventsData' => $eventsData, 'editEventId' => $editEventId, 'accessToken' => $accessToken]);
+}
 
 
     public function createEvent(Request $request)
@@ -220,6 +369,11 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
     // Get the data from the POST request body
     $requestData = $request->json()->all();
 
+    if (isset($requestData['onlineMeetingProvider'])) {
+        $onlineMeetingProvider = $requestData['onlineMeetingProvider'];
+    } else {
+        $onlineMeetingProvider = 'default_value'; 
+    }
     // Extract the data from the request body
     $accessToken = $requestData['accesstoken'];
     $subject = $requestData['subject'];
@@ -228,6 +382,7 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
     $timeZone = $requestData['timezone'];
     $location = $requestData['location'];
     $content = $requestData['content'];
+    $isOnlineMeeting =$requestData['isOnlineMeeting'];
     $requiredAttendees = $requestData['attendeesRequired'];
     $optionalAttendees = $requestData['attendeesOptional'];
 
@@ -250,8 +405,11 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
             "content" => $content
         ],
         "attendees" => [],
+        "isOnlineMeeting" => $isOnlineMeeting,
     ];
-
+    if ($isOnlineMeeting) {
+        $event_data["onlineMeetingProvider"] = $onlineMeetingProvider; 
+    }
     // Add required attendees to the event data
     foreach ($requiredAttendees as $email) {
         $event_data['attendees'][] = [
@@ -273,12 +431,12 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
             "type" => "optional"
         ];
     }
-
+    //echo($event_data);
     // Initialize the HTTP client
     $client = new Client([
         'verify' => false, // Disable SSL verification if needed (not recommended for production)
     ]);
-
+    Log::info('Event data:', $event_data);
     try {
         $response = $client->post('https://graph.microsoft.com/v1.0/me/events', [
             'headers' => [
@@ -287,13 +445,14 @@ use Microsoft\Graph\Model\AttendeeType;class OutlookCalendarController extends C
             ],
             'json' => $event_data,
         ]);
-
         // Handle the response as needed (e.g., check for success)
         $statusCode = $response->getStatusCode();
-
+    
         if ($statusCode === 201) {
             // Event created successfully
-            return response()->json(['message' => 'Event created successfully']);
+            //return response()->json(['message' => 'Event created successfully']);
+            //return response()->json();
+            return response()->json();
         } else {
             // Handle error response
             return response()->json(['error' => 'Event creation failed'], $statusCode);
@@ -641,6 +800,70 @@ public function refreshEvents(Request $request)
         return response()->json(['error' => 'Token request exception'], 500);
     }
 }
+
+public function createMeeting()
+{
+   
+$accessToken ='EwBoA8l6BAAUAOyDv0l6PcCVu89kmzvqZmkWABkAAbpCuNgHsjZlT0Xkm1qyWxBeVjvO0E+zqVXtZ0M7MKzMVZdHFhl/QLEVhIy2KaqkCfBrWqGRIvI/ntyQvYluqH8EuRlBcbrsHhT1qbjY8O/TQ8odfO7Ux9M7/5ucw2dC60zXu3UvHCgXamDrJa5lEcYyqf2STNNFYyEA2iUUeymD3tXUhPGokB/v73gyMd90mMKRlzRleu3ly82vZ+2CE970Bd7KlgwTp5t9uxikC8E2LM7z1gRpqjD5yz5RyyipbYrtHJGMb07IaFnSvYtCcpI0PUAxR4MfdGJsNQ6nckb2+2ZV54POciNJ2vjahvF+nLCcrcWXW+1PbyDXp8ZwA4QDZgAACK+qGXNsOF52OALDPhzRp01Cn8DXQS5mNlB/MPHVq72/nQ75wBIbg6nwqsh4MTdFZe4w9lmOAtLwQ8TWe1cIzxBpvGsSrC35o/B//fDd+r5r4prhUZRkkgcNiAXAAGzpKDOcKrrP1QGPvTWgPghxyM5NU6eal6StnfLwLI9P60WlAB4xI/X7OAAWVD8Ufu5Auq44aJnqYGwNrn9i+hEWZF/UGz7SBY1H3S3NLepNuJkZCA75xUA8sb8jSxw99Je5oiQuqESRFEclKpNLcrnxJ2rgWAho2eLAzDQXlk/5pwMv0HEmudzupW2nc5wiFL0/4TV+gu7k7HOWNv1eqR6PvOm640ZMRjWiQLhnq+j2lp/GOeW/9pRorxzim022KApe81eoH8C0FiSRbTqz5jho23i0edeD2cY6tPeIs8SdQhKBHwaWtg+2aKizCnkO489UuZ44h8RO3DA5+Q5m39ijLmQ/2VX8aWk5yuU/XVe0+xt+kWcHDukLEeqfcwc/3qq9fYCJLxqIBchoR8mO1cJ/LC7wpirEGGgThjky90JA3JkdAJTXDxlpQr6Gq7EYCqjH5dIuv/BGynO67j4HG9tczmK+401QxNqaMmXgczagStJYFXTz+wyEfjp3Ln2/uzMHWr/A1Ev5fe5lXOXoHT8uOZFwEXPHLssen/9GCt2+hBTnRaOFbC0ya25t7GOnxU09l3F7XZlKPYw+U2L0u/GaLJ6smyCmhruiP6OeC/MM84Y/TarVvfTrg7bQYcyiNp6GKrpEgwI=';
+// Acquire an access token with appropriate permissions
+
+
+// Create a meeting in Microsoft Teams
+$client = new Client([
+    'verify' => false, // Disable SSL verification if needed
+]);
+$response = $client->post('https://graph.microsoft.com/v1.0/me/events', [
+    'headers' => [
+        'Authorization' => 'Bearer ' . $accessToken,
+        'Content-Type' => 'application/json',
+    ],
+    'json' => [
+        "subject" => "Let's go for lunch",
+        "body" => [
+            "contentType" => "HTML",
+            "content" => "Does noon work for you?"
+        ],
+        "start" => [
+            "dateTime" => "2023-10-26T12:00:00",
+            "timeZone" => "Pacific Standard Time"
+        ],
+        "end" => [
+            "dateTime" => "2023-10-26T14:00:00",
+            "timeZone" => "Pacific Standard Time"
+        ],
+        "location" => [
+            "displayName" => "Harry's Bar"
+        ],
+        "attendees" => [
+            [
+                "emailAddress" => [
+                    "address" => "gopi.smiksystems@gmail.com",
+                    "name" => ""
+                ],
+                "type" => "required"
+            ]
+        ],
+        //"allowNewTimeProposals" => true,
+        "isOnlineMeeting" => true,
+        //"onlineMeetingProvider" => "teamsForBusiness",
+        //"AllowNewTimeProposals" => true,  
+        //OnlineMeetingProvider OnlineMeetingProviderType.TeamsForBusiness  
+    ],
+]);
+
+
+// Parse the response and retrieve the meeting link
+$data = json_decode($response->getBody(), true);
+return $data;
+// $meetingLink now contains the Microsoft Teams meeting link
+
+}
+
+
+
+
+
+
 }
 
 

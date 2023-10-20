@@ -16,6 +16,11 @@ class VerifyCsrfToken extends Middleware
         'update-event',
         'cancel-event',
         'delete-event',
-        'get-event'
+        'get-event',
+        'add-meeting',
+        'add',
+        'data',
+        'geteventsData',
+        'events'
     ];
 }

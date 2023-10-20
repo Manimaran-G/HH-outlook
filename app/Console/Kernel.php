@@ -7,21 +7,16 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
-    /**
-     * Define the application's command schedule.
-     */
-    protected function schedule(Schedule $schedule): void
+    protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+        $schedule->call('App\Http\Controllers\OutlookCalendarController@refreshToken')->everyMinute(); // Adjust the frequency as needed
     }
+    
+    
 
     /**
-     * Register the commands for the application.
+     * Register the commands for the application. 
      */
-    protected function commands(): void
-    {
-        $this->load(__DIR__.'/Commands');
-
-        require base_path('routes/console.php');
-    }
+  
+    
 }

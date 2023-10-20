@@ -11,7 +11,7 @@
       <h4>Welcome {{ $userName }}!</h4>
       <p>Use the navigation bar at the top of the page to get started.</p>
     @else
-      <a href="/hello" class="btn btn-primary btn-large">Click here to sign innn</a>
+      <a href="/hello" class="btn btn-primary btn-large">Click here to sign in</a>
     @endif
   </div>
   @endsection

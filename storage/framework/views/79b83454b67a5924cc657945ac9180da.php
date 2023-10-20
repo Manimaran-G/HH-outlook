@@ -1,12 +1,15 @@
-@extends('layout')
-
-@section('content')
+<?php
+    $eventsData = session('eventsData');
+    $editEventId = session('editEventId');
+    $accessToken = session('accessToken');
+?>
+<?php $__env->startSection('content'); ?>
 <div class="jumbotron">
     <p class="lead">Events</p>
-    @if(!empty($eventsData))
+    <?php if(!empty($eventsData)): ?>
         <h4>Welcome to the Events Page!</h4>
         <form id="eventForm">
-            @csrf
+            <?php echo csrf_field(); ?>
             <div class="form-group">
                 <label for="subject">Subject:</label>
                 <input type="text" id="subject" name="subject" class="form-control" required>
@@ -51,10 +54,10 @@
                 </select>
             </div>
 
-            @if ($editEventId === 0)
+            <?php if($editEventId === 0): ?>
             <button type="button" id="createEvent" class="btn btn-primary">Submit Event</button>
-            <a href="/data" class="btn btn-primary btn-large">Refresh</a>
-            @endif
+            <button type="button" onclick="GetEvent()" class="btn btn-secondary">Refresh</button>
+            <?php endif; ?>
         </form>
         
         <table class="table table-bordered">
@@ -69,21 +72,21 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($eventsData as $event)
+                <?php $__currentLoopData = $eventsData; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $event): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                     <tr>
-                        <td>{{ $event['title'] }}</td>
-                        <td>{{ $event['start'] }}</td>
-                        <td>{{ $event['end'] }}</td>
-                        <td>{{ $event['location'] }}</td>
-                        <td><button onclick="HandleEdit({{json_encode($event)}})">edit</button></td>
-                        <td><button class="cancel-button" onclick="CancelEvent('{{$event['event_id']}}')">cancel</button></td>
+                        <td><?php echo e($event['title']); ?></td>
+                        <td><?php echo e($event['start']); ?></td>
+                        <td><?php echo e($event['end']); ?></td>
+                        <td><?php echo e($event['location']); ?></td>
+                        <td><button onclick="HandleEdit(<?php echo e(json_encode($event)); ?>)">edit</button></td>
+                        <td><button class="cancel-button" onclick="CancelEvent('<?php echo e($event['event_id']); ?>')">cancel</button></td>
                     </tr>
-                @endforeach
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
             </tbody>
         </table>
-    @else
+    <?php else: ?>
         <p>No events data available.</p>
-    @endif
+    <?php endif; ?>
 </div>
 
 
@@ -91,15 +94,13 @@
 
 
 <script>
-let eventsData = @json($eventsData);
-let editEventId = {{ $editEventId }};
-const accessToken = "{{ $accessToken }}";
 
-// let eventsData = @json($eventsData); 
-// //let editEventId = {{ $editEventId }};
-// let editEventId = 0;
 
-// const accessToken = "{{$accessToken}}";
+let eventsData = <?php echo json_encode($eventsData, 15, 512) ?>; 
+//let editEventId = <?php echo e($editEventId); ?>;
+let editEventId = 0;
+
+const accessToken = "<?php echo e($accessToken); ?>";
 console.log(editEventId, "editEventId");
 
 console.log("eventsData",eventsData,editEventId);
@@ -144,7 +145,7 @@ if(editEventId===0){
     .then(data => {
         if (data.success) {
             eventsData.push(data.event); // Assuming the server responds with the created event
-
+           
         } else {
             console.error("Event creation failed:", data.error);
         }
@@ -259,4 +260,6 @@ function clearFormFields() {
 }
 
 </script>
-@endsection
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layout', \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?><?php /**PATH D:\_WorkSpace\HH-outlook-main\resources\views/events.blade.php ENDPATH**/ ?>

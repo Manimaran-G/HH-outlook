@@ -34,12 +34,26 @@ Route::get('/addevent111', [OutlookCalendarController::class,'createEvent1']);
 
 Route::get('/hello', [OutlookCalendarController::class,'index']);
 Route::get('/callback', [OutlookCalendarController::class,'callback']);
+
+Route::get('/events', [OutlookCalendarController::class, 'goEvents'])->name('goEvents');
+
+
+Route::get('/data', [OutlookCalendarController::class, 'getAllEvents']);
+
+//Route::get('/events', [OutlookCalendarController::class,'goEvents']);
+
+
 Route::post('/add-event', [OutlookCalendarController::class,'createEvent']);
 Route::patch('/update-event', [OutlookCalendarController::class,'updateEvent']);
 Route::post('/cancel-event', [OutlookCalendarController::class,'cancelEvent']);
 Route::delete('/delete-event', [OutlookCalendarController::class,'deleteEvent']);
 Route::post('/get-event', [OutlookCalendarController::class,'listEvents']);
 Route::post('/refresh-event', [OutlookCalendarController::class,'refreshEvents']);
+Route::post('/geteventsData', [OutlookCalendarController::class,'getEventsData']);
+
+
+Route::get('/add-meeting', [OutlookCalendarController::class,'createMeeting']);
+Route::post('/add', [OutlookCalendarController::class,'createMeeting1']);
 
 
 
